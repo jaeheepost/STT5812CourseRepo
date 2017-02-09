@@ -1,0 +1,122 @@
+---
+title: "week2"
+author: "jaehee"
+date: "1/26/2017"
+output: bookdown::html_document2
+---
+
+```{r setup, include=FALSE}
+library(PASWR2)
+library(dplyr)
+bugs<-DROSOPHILA %>%
+  filter(line != "Susceptible ")
+DT::datatable(bugs)
+
+```
+# First level header{-}
+\@
+
+#head(DROSOPHILA)
+```{r}
+library(ggplot2)
+ggplot(data =bugs, aes(x = fecundity )) +
+ geom_histogram(fill = "orange", color = "black", binwidth = 5) + theme_bw() + labs(x = "Number of eggs") 
+```
+#Testing hypothsises {-}
+$H_0: \mu_{\textrm{nonselected}} -\mu_{\textrm{resistant}} =0$
+$H_A:\mu_{\textrm{nonselected}} -\mu_{\textrm{resistant}} > 0$
+
+
+```{r}
+library(dplyr)
+bugs<- DROSOPHILA %>%
+  filter(line !="Susceptible") %>%
+  group_by(line) %>%
+  summarize(MF = mean(fecundity), SF= sd(fecundity), n = n())
+bugs
+
+```
+
+
+```{r}
+xbar1 <- bugs[1, 2]
+xbar2 <- bugs[2, 2]
+s1 <- bugs[1, 3]
+s2 <- bugs[2, 3]
+n1 <- bugs[1, 4]
+n2 <- bugs[2, 4]
+TS <- (xbar1 - xbar2)/(s1^2/n1 + s2^2/n2)^0.5
+names(TS) <- "TestStatistic"
+TS
+str(TS$TestStatistic)
+nu <- (s1^2/n1 + s2^2/n2)^2 / ((s1^2/n1)^2/(n1-1) + (s2^2/n2)^2/(n2-1))
+names(nu) <- "DegreesOfFreedom"
+nu
+```
+
+```{r}
+DF <- DROSOPHILA %>%
+  filter(line != "Susceptible")
+DF
+
+
+
+```
+
+```{r}
+ts <- TS$TestStatistic
+ts
+nu <- nu$DegreesOfFreedom
+nu
+pvalue <- pt(ts, nu, lower = FALSE)
+pvalue
+```
+
+The $P(t_{\nu} = t_{`r nu`} \ge `r ts`) = `r pvalue`.$
+
+```{r}
+t.test(fecundity ~ line, data = DF, alternative = "less")
+```
+
+## Permutation/Randomization Testing
+
+```{r}
+N <- 10^4 - 1
+PTS <- numeric(N)
+for(i in 1:N){
+  PTS[i] <- t.test(fecundity ~ sample(line), data = DF)$stat
+}
+epv <- (sum(PTS >= ts) + 1)/(N + 1)
+epv
+ggplot(data = data.frame(x = PTS), aes(x = x)) +
+  geom_density(fill = "orange") + 
+  theme_bw()
+```
+
+
+## Bootstrapping Percentile CI
+
+* Key difference is that sampling is done with replacement!
+
+```{r}
+fecundityR<- DF$fecundity[DF$line =="Resistant"]
+fecundityR
+fecundityN <- subset(DF,line == "Nonselected", select = fecundity, drop = TRUE)
+fecundityN
+```
+
+```{r}
+B <- 10^4 - 1
+BSD <- numeric(B)
+for(i in 1:B){
+  bs1 <- sample(fecundityR, size = 5, replace = TRUE)
+  bs2 <- sample(fecundityN, size = 5, replace = TRUE)
+  BSD[i] <- mean(bs1) - mean(bs2)
+}
+ggplot(data = data.frame(x = BSD), aes(x = x)) +
+  geom_density(fill = "lightblue") +
+  theme_bw()
+quantile(BSD, probs = c(0.05, 0.90))
+```
+
+
